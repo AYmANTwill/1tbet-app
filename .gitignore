@@ -1,0 +1,12 @@
+.env
+data/raw/*.csv
+data/matches_all.csv
+model/*.pkl
+__pycache__/
+*.pyc
+.venv/
+venv/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
