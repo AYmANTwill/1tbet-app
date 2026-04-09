@@ -56,16 +56,22 @@ def temporal_split(df, test_seasons=1):
 
 
 def get_feature_columns(df):
-    """Determine les colonnes disponibles (Pinnacle n'est pas toujours la)."""
-    cols = FEATURE_COLS.copy()
-
-    # Ajouter Pinnacle si disponible
-    if all(c in df.columns for c in PINNACLE_FEATURES):
-        cols.extend(PINNACLE_FEATURES)
-        print(f"   Pinnacle disponible : {len(cols)} features")
-    else:
-        print(f"   Pinnacle indisponible : {len(cols)} features (Bet365 only)")
-
+    """Approche hybride : Elo + forme + Bet365 seulement."""
+    cols = [
+        "elo_home_prob",
+        "elo_diff",
+        "home_form_scored",
+        "away_form_scored",
+        "home_form_conceded",
+        "away_form_conceded",
+        "expected_goal_diff",
+        "b365_norm_home",
+        "b365_norm_draw",
+        "b365_norm_away",
+        "odds_diff",
+    ]
+    cols = [c for c in cols if c in df.columns]
+    print(f"   Mode HYBRIDE : {len(cols)} features (Bet365 + Elo + forme)")
     return cols
 
 
@@ -282,7 +288,7 @@ def main():
     metrics = evaluate(raw_model, calibrated, X_test, y_test, test_clean)
 
     # 9. Backtest +EV
-    backtest_ev(test_clean, metrics["probabilities"], min_edge=0.03)
+    backtest_ev(test_clean, metrics["probabilities"], min_edge=0.12)
 
     # 10. Sauvegarder
     Path("model").mkdir(exist_ok=True)

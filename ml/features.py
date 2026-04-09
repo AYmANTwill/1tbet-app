@@ -215,3 +215,14 @@ PINNACLE_FEATURES = [
     "pin_norm_draw",
     "pin_norm_away",
 ]
+
+
+# Features SANS les cotes bookmaker (pour decorrelation)
+DECORRELATED_FEATURES = [
+    "elo_prob_home",
+    "elo_diff",
+    "home_form",
+    "away_form",
+    "home_def_form",
+    "away_def_form",
+]
