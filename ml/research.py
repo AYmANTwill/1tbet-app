@@ -643,6 +643,141 @@ def run_research():
     print("RECHERCHE TERMINEE")
     print("=" * 60)
 
+def segmentation_analysis():
+    """Analyse de segmentation pour trouver la niche profitable."""
+    print("=" * 60)
+    print("ANALYSE DE SEGMENTATION")
+    print("=" * 60)
+
+    # Charger et preparer
+    df = load_raw_data()
+    result = build_advanced_features(df)
+    if result is None:
+        return
+    df, feature_cols = result
+
+    seasons = sorted(df["season"].unique())
+    test_season = seasons[-1]
+    train_df = df[df["season"] != test_season].copy()
+    test_df = df[df["season"] == test_season].copy()
+
+    X_train = train_df[feature_cols]
+    y_train = train_df["target"]
+    X_test = test_df[feature_cols]
+
+    # Entrainer le meilleur modele (alpha=0)
+    weights = np.ones(len(train_df)).astype(np.float32)
+    model = train_decorrelated(X_train, y_train, weights, feature_cols)
+    cal = CalibratedClassifierCV(estimator=model, method="sigmoid", cv=3)
+    cal.fit(X_train, y_train)
+    probs = cal.predict_proba(X_test)
+
+    stake = 10.0
+
+    # ---- SEGMENTATION PAR LIGUE ----
+    print("\n   DRAW par ligue (edge > 5%) :")
+    print(f"   {'Ligue':<20} {'Paris':>6} {'Win%':>7} {'ROI':>8} {'Avg odds':>9}")
+    print(f"   {'-'*52}")
+
+    for league in sorted(test_df["league_code"].unique()):
+        mask = test_df["league_code"].values == league
+        bets = []
+        for i, (_, match) in enumerate(test_df.iterrows()):
+            if not mask[i]:
+                continue
+            odds_d = match.get("b365_draw")
+            if pd.isna(odds_d) or odds_d <= 1.0:
+                continue
+            edge = probs[i, 1] - 1/odds_d
+            if edge >= 0.05:
+                won = match["result"] == "D"
+                bets.append({"won": won, "profit": stake*(odds_d-1) if won else -stake, "odds": odds_d})
+        if bets:
+            bdf = pd.DataFrame(bets)
+            roi = bdf["profit"].sum() / (len(bdf)*stake) * 100
+            marker = " $$$" if roi > 0 else ""
+            print(f"   {league:<20} {len(bdf):>6} {bdf['won'].mean():>6.1%} {roi:>+7.1f}% {bdf['odds'].mean():>8.2f}{marker}")
+
+    # ---- SEGMENTATION AWAY PAR LIGUE ----
+    print("\n   AWAY par ligue (edge > 5%) :")
+    print(f"   {'Ligue':<20} {'Paris':>6} {'Win%':>7} {'ROI':>8}")
+    print(f"   {'-'*43}")
+
+    for league in sorted(test_df["league_code"].unique()):
+        mask = test_df["league_code"].values == league
+        bets = []
+        for i, (_, match) in enumerate(test_df.iterrows()):
+            if not mask[i]:
+                continue
+            odds_a = match.get("b365_away")
+            if pd.isna(odds_a) or odds_a <= 1.0:
+                continue
+            edge = probs[i, 2] - 1/odds_a
+            if edge >= 0.05:
+                won = match["result"] == "A"
+                bets.append({"won": won, "profit": stake*(odds_a-1) if won else -stake})
+        if bets:
+            bdf = pd.DataFrame(bets)
+            roi = bdf["profit"].sum() / (len(bdf)*stake) * 100
+            marker = " $$$" if roi > 0 else ""
+            print(f"   {league:<20} {len(bdf):>6} {bdf['won'].mean():>6.1%} {roi:>+7.1f}%{marker}")
+
+    # ---- SEGMENTATION PAR RANGE DE COTES ----
+    print("\n   AWAY par range de cotes (edge > 5%) :")
+    print(f"   {'Range':<20} {'Paris':>6} {'Win%':>7} {'ROI':>8}")
+    print(f"   {'-'*43}")
+
+    for lo, hi, label in [(1.5, 2.5, "1.50-2.50"), (2.5, 3.5, "2.50-3.50"),
+                           (3.5, 5.0, "3.50-5.00"), (5.0, 20.0, "5.00+")]:
+        bets = []
+        for i, (_, match) in enumerate(test_df.iterrows()):
+            odds_a = match.get("b365_away")
+            if pd.isna(odds_a) or odds_a <= 1.0:
+                continue
+            if not (lo <= odds_a < hi):
+                continue
+            edge = probs[i, 2] - 1/odds_a
+            if edge >= 0.05:
+                won = match["result"] == "A"
+                bets.append({"won": won, "profit": stake*(odds_a-1) if won else -stake})
+        if bets:
+            bdf = pd.DataFrame(bets)
+            roi = bdf["profit"].sum() / (len(bdf)*stake) * 100
+            marker = " $$$" if roi > 0 else ""
+            print(f"   {label:<20} {len(bdf):>6} {bdf['won'].mean():>6.1%} {roi:>+7.1f}%{marker}")
+
+    # ---- ELO CLOSENESS ----
+    print("\n   DRAW par elo_closeness (edge > 5%) :")
+    print(f"   {'Range':<20} {'Paris':>6} {'Win%':>7} {'ROI':>8}")
+    print(f"   {'-'*43}")
+
+    for lo, hi, label in [(0.0, 0.5, "Desequilibre"), (0.5, 0.7, "Moyen"),
+                           (0.7, 0.85, "Proche"), (0.85, 1.0, "Tres proche")]:
+        bets = []
+        for i, (_, match) in enumerate(test_df.iterrows()):
+            ec = test_df.iloc[i].get("elo_closeness", 0.5)
+            if not (lo <= ec < hi):
+                continue
+            odds_d = match.get("b365_draw")
+            if pd.isna(odds_d) or odds_d <= 1.0:
+                continue
+            edge = probs[i, 1] - 1/odds_d
+            if edge >= 0.05:
+                won = match["result"] == "D"
+                bets.append({"won": won, "profit": stake*(odds_d-1) if won else -stake})
+        if bets:
+            bdf = pd.DataFrame(bets)
+            roi = bdf["profit"].sum() / (len(bdf)*stake) * 100
+            marker = " $$$" if roi > 0 else ""
+            print(f"   {label:<20} {len(bdf):>6} {bdf['won'].mean():>6.1%} {roi:>+7.1f}%{marker}")
+
+    print("\n" + "=" * 60)
+    print("SEGMENTATION TERMINEE")
+    print("=" * 60)
 
 if __name__ == "__main__":
-    run_research()
+    import sys
+    if "--segment" in sys.argv:
+        segmentation_analysis()
+    else:
+        run_research()
