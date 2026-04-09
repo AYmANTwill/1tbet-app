@@ -1,0 +1,10 @@
+{
+  "bankroll": 1000,
+  "initial_bankroll": 1000,
+  "pending": [],
+  "history": [],
+  "total_bets": 0,
+  "total_wins": 0,
+  "total_profit": 0.0,
+  "created_at": "2026-04-09T02:04:10.769419"
+}
