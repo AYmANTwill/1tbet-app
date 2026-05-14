@@ -23,6 +23,10 @@ from pathlib import Path
 import warnings
 warnings.filterwarnings("ignore")
 
+# ATTENTION : Les donnees tennis-data.co.uk ont un DATA LEAKAGE
+# B365W/PSW = cotes du GAGNANT (retrospectif). Inutilisable pour Kaunitz.
+# Il faudrait des donnees avec cotes par Player1/Player2 (pas Winner/Loser).
+
 
 def analyze_tennis():
     print("\n" + "=" * 60)
@@ -109,6 +113,10 @@ def analyze_tennis():
         pv = np.mean(np.array(rr)>=real)
         v = "SIGNIFICATIF" if pv<0.05 else "non significatif"
         print(f"\n   Permutation: ROI={real:+.1f}%, p={pv:.4f} -> {v}")
+        
+    print("\n   ATTENTION : DATA LEAKAGE DETECTE")
+    print("   B365W = cote du gagnant (retrospectif). Ces resultats sont INVALIDES.")
+    print("   Il faudrait des donnees Player1/Player2 pour un vrai backtest.")
 
 
 def analyze_football():
